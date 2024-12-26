@@ -1,20 +1,25 @@
+const pauseButton = document.getElementById("pause-button");
+const playButton = document.getElementById("play-button");
+const trashButton = document.getElementById("trash-button");
+
 class Canvas {
   constructor(game) {
     this.canvas = document.getElementById("game-of-life");
     this.ctx = this.canvas.getContext("2d");
-    this.cellSize = 10;
+    this.cellSize = 25;
     this.game = game;
 
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
 
-    this.offsetX = this.canvas.width / 2 - this.cellSize / 2;
-    this.offsetY = this.canvas.height / 2 - this.cellSize / 2;
+    this.offsetX = this.canvas.width / 2;
+    this.offsetY = this.canvas.height / 2;
     this.isPanning = false;
     this.startX = 0;
     this.startY = 0;
     this.initialOffsetX = 0;
     this.initialOffsetY = 0;
+    this.mouseMoveSinceLastClick = false;
 
     this.minCellSize = 2;
     this.maxCellSize = 50;
@@ -36,7 +41,32 @@ class Canvas {
     this.canvas.addEventListener("mousemove", this.handleMouseMove);
     this.canvas.addEventListener("mouseup", this.handleMouseUp);
     this.canvas.addEventListener("mouseleave", this.handleMouseLeave);
-    this.canvas.addEventListener("wheel", this.handleWheel, { passive: false });
+    this.canvas.addEventListener("wheel", this.handleWheel);
+  }
+
+  handleTouchStart(event) {
+    if (event.touches.length !== 1) return;
+
+    const touch = event.touches[0];
+    this.isPanning = true;
+    this.startX = touch.clientX;
+    this.startY = touch.clientY;
+    this.initialOffsetX = this.offsetX;
+    this.initialOffsetY = this.offsetY;
+    this.canvas.style.cursor = "grabbing";
+    this.mouseMoveSinceLastClick = false;
+  }
+
+  handleTouchMove(event) {
+    if (!this.isPanning || event.touches.length !== 1) return;
+
+    const touch = event.touches[0];
+    const dx = touch.clientX - this.startX;
+    const dy = touch.clientY - this.startY;
+    this.offsetX = this.initialOffsetX + dx;
+    this.offsetY = this.initialOffsetY + dy;
+    this.mouseMoveSinceLastClick = true;
+    this.draw();
   }
 
   handleWheel(event) {
@@ -63,32 +93,25 @@ class Canvas {
     this.draw();
   }
 
-  handleTouchStart(event) {
-    if (event.touches.length !== 1) return;
+  handleAddCellAfterClick(x, y) {
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = x - rect.left;
+    const mouseY = y - rect.top;
+    const worldX = Math.floor((mouseX - this.offsetX) / this.cellSize);
+    const worldY = Math.floor((mouseY - this.offsetY) / this.cellSize);
 
-    const touch = event.touches[0];
-    this.isPanning = true;
-    this.startX = touch.clientX;
-    this.startY = touch.clientY;
-    this.initialOffsetX = this.offsetX;
-    this.initialOffsetY = this.offsetY;
-    this.canvas.style.cursor = "grabbing";
-  }
-
-  handleTouchMove(event) {
-    if (!this.isPanning || event.touches.length !== 1) return;
-
-    const touch = event.touches[0];
-    const dx = touch.clientX - this.startX;
-    const dy = touch.clientY - this.startY;
-    this.offsetX = this.initialOffsetX + dx;
-    this.offsetY = this.initialOffsetY + dy;
+    const cellKey = `${worldX},${worldY}`;
+    if (this.game.cells.has(cellKey)) {
+      this.game.cells.delete(cellKey);
+    } else {
+      this.game.cells.add(cellKey);
+    }
     this.draw();
   }
 
   handleTouchEnd() {
     this.isPanning = false;
-    this.canvas.style.cursor = "grab";
+    this.canvas.style.cursor = "grab";    
   }
 
   handleMouseDown(event) {
@@ -98,6 +121,7 @@ class Canvas {
     this.initialOffsetX = this.offsetX;
     this.initialOffsetY = this.offsetY;
     this.canvas.style.cursor = "grabbing";
+    this.mouseMoveSinceLastClick = false;
   }
 
   handleMouseMove(event) {
@@ -107,12 +131,16 @@ class Canvas {
     const dy = event.clientY - this.startY;
     this.offsetX = this.initialOffsetX + dx;
     this.offsetY = this.initialOffsetY + dy;
+    this.mouseMoveSinceLastClick = true;
     this.draw();
   }
 
-  handleMouseUp() {
+  handleMouseUp(event) {
     this.isPanning = false;
     this.canvas.style.cursor = "grab";
+    if (!this.mouseMoveSinceLastClick) {
+      this.handleAddCellAfterClick(event.clientX, event.clientY);
+    }
   }
 
   handleMouseLeave() {
@@ -127,8 +155,8 @@ class Canvas {
     this.ctx.save();
     this.ctx.translate(this.offsetX, this.offsetY);
 
-    this.ctx.strokeStyle = "rgb(90, 90, 90)";
-    this.drawGrid();
+    // this.ctx.strokeStyle = "rgb(90, 90, 90)";
+    // this.drawGrid();
 
     this.ctx.fillStyle = "#fff";
     const cellObjects = this.game.getCellObjects();
@@ -136,8 +164,8 @@ class Canvas {
       this.ctx.fillRect(
         cell.x * this.cellSize,
         cell.y * this.cellSize,
-        this.cellSize,
-        this.cellSize
+        this.cellSize + 1,
+        this.cellSize + 1
       );
     }
     this.ctx.restore();
@@ -167,6 +195,7 @@ class Canvas {
 class Game {
   constructor(cells) {
     this.cells = new Set(cells.map(cell => `${cell.x},${cell.y}`));
+    this.paused = true;
   }
 
   getNeighbors(key) {
@@ -235,6 +264,29 @@ window.addEventListener("resize", () => {
 });
 
 setInterval(() => {
+  if (game.paused) return;
   canvasInstance.draw();
   game.nextGeneration();
 }, 100);
+
+pauseButton.addEventListener("click", () => {
+  playButton.style.display = "block";
+  pauseButton.style.display = "none";
+  game.paused = true;
+  canvasInstance.draw();
+});
+
+playButton.addEventListener("click", () => {
+  playButton.style.display = "none";
+  pauseButton.style.display = "block";
+  game.paused = false;
+  canvasInstance.draw();
+});
+
+trashButton.addEventListener("click", () => {
+  game.cells.clear();
+  game.paused = true;
+  playButton.style.display = "block";
+  pauseButton.style.display = "none";
+  canvasInstance.draw();
+});

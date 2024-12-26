@@ -21,11 +21,48 @@
       width: 100vw;
       height: 100vh;
     }
+
+    #settings-wrapper {
+      position: absolute;
+      bottom: 50px;
+      right: 50px;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #settings-wrapper img {
+      width: 50px;
+    }
+
+    #settings-wrapper button {
+      background-color: rgba(255, 255, 255, 0.8);
+      border-radius: 25%;
+      border: none;
+      cursor: pointer;
+      padding: 20px;
+    }
+
+    #settings-wrapper button:hover {
+      background-color: rgba(255, 255, 255, 1);
+    }
   </style>
 </head>
 
 <body>
   <canvas id="game-of-life"></canvas>
+  <div id="settings-wrapper">
+    <button id="trash-button">
+      <img src="./assets/trash.svg" alt="Clear">
+    </button>
+    <button id="pause-button" style="display: none;">
+      <img src="./assets/pause.svg" alt="Pause">
+    </button>
+    <button id="play-button">
+      <img src="./assets/play.svg" alt="Play">
+    </button>
+  </div>
   <script src="./script.js"></script>
 </body>
 
