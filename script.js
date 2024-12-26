@@ -20,11 +20,48 @@ class Canvas {
     this.handleMouseMove = this.handleMouseMove.bind(this);
     this.handleMouseUp = this.handleMouseUp.bind(this);
     this.handleMouseLeave = this.handleMouseLeave.bind(this);
+    this.handleTouchStart = this.handleTouchStart.bind(this);
+    this.handleTouchMove = this.handleTouchMove.bind(this);
+    this.handleTouchEnd = this.handleTouchEnd.bind(this);
 
+    this.canvas.addEventListener("touchstart", this.handleTouchStart, { passive: false });
+    this.canvas.addEventListener("touchmove", this.handleTouchMove, { passive: false });
+    this.canvas.addEventListener("touchend", this.handleTouchEnd);
+    this.canvas.addEventListener("touchcancel", this.handleTouchEnd);
     this.canvas.addEventListener("mousedown", this.handleMouseDown);
     this.canvas.addEventListener("mousemove", this.handleMouseMove);
     this.canvas.addEventListener("mouseup", this.handleMouseUp);
     this.canvas.addEventListener("mouseleave", this.handleMouseLeave);
+  }
+
+  handleTouchStart(event) {
+    if (event.touches.length !== 1) return;
+    event.preventDefault();
+
+    const touch = event.touches[0];
+    this.isPanning = true;
+    this.startX = touch.clientX;
+    this.startY = touch.clientY;
+    this.initialOffsetX = this.offsetX;
+    this.initialOffsetY = this.offsetY;
+    this.canvas.style.cursor = "grabbing";
+  }
+
+  handleTouchMove(event) {
+    if (!this.isPanning || event.touches.length !== 1) return;
+    event.preventDefault(); // Empêche le défilement de la page
+
+    const touch = event.touches[0];
+    const dx = touch.clientX - this.startX;
+    const dy = touch.clientY - this.startY;
+    this.offsetX = this.initialOffsetX + dx;
+    this.offsetY = this.initialOffsetY + dy;
+    this.draw();
+  }
+
+  handleTouchEnd() {
+    this.isPanning = false;
+    this.canvas.style.cursor = "grab";
   }
 
   handleMouseDown(event) {
