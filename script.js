@@ -8,13 +8,16 @@ class Canvas {
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
 
-    this.offsetX = this.canvas.width / 2;
-    this.offsetY = this.canvas.height / 2;
+    this.offsetX = this.canvas.width / 2 - this.cellSize / 2;
+    this.offsetY = this.canvas.height / 2 - this.cellSize / 2;
     this.isPanning = false;
     this.startX = 0;
     this.startY = 0;
     this.initialOffsetX = 0;
     this.initialOffsetY = 0;
+
+    this.minCellSize = 2;
+    this.maxCellSize = 50;
 
     this.handleMouseDown = this.handleMouseDown.bind(this);
     this.handleMouseMove = this.handleMouseMove.bind(this);
@@ -23,6 +26,7 @@ class Canvas {
     this.handleTouchStart = this.handleTouchStart.bind(this);
     this.handleTouchMove = this.handleTouchMove.bind(this);
     this.handleTouchEnd = this.handleTouchEnd.bind(this);
+    this.handleWheel = this.handleWheel.bind(this);
 
     this.canvas.addEventListener("touchstart", this.handleTouchStart, { passive: false });
     this.canvas.addEventListener("touchmove", this.handleTouchMove, { passive: false });
@@ -32,11 +36,35 @@ class Canvas {
     this.canvas.addEventListener("mousemove", this.handleMouseMove);
     this.canvas.addEventListener("mouseup", this.handleMouseUp);
     this.canvas.addEventListener("mouseleave", this.handleMouseLeave);
+    this.canvas.addEventListener("wheel", this.handleWheel, { passive: false });
+  }
+
+  handleWheel(event) {
+    const { deltaY, clientX, clientY } = event;
+
+    const zoomFactor = deltaY < 0 ? 1.1 : 0.9;
+    const newCellSize = this.cellSize * zoomFactor;
+
+    if (newCellSize < this.minCellSize || newCellSize > this.maxCellSize) {
+      return;
+    }
+
+    const mouseX = clientX - this.canvas.getBoundingClientRect().left;
+    const mouseY = clientY - this.canvas.getBoundingClientRect().top;
+
+    const worldXBeforeZoom = (mouseX - this.offsetX) / this.cellSize;
+    const worldYBeforeZoom = (mouseY - this.offsetY) / this.cellSize;
+
+    this.cellSize = newCellSize;
+
+    this.offsetX = mouseX - worldXBeforeZoom * this.cellSize;
+    this.offsetY = mouseY - worldYBeforeZoom * this.cellSize;
+
+    this.draw();
   }
 
   handleTouchStart(event) {
     if (event.touches.length !== 1) return;
-    event.preventDefault();
 
     const touch = event.touches[0];
     this.isPanning = true;
@@ -49,7 +77,6 @@ class Canvas {
 
   handleTouchMove(event) {
     if (!this.isPanning || event.touches.length !== 1) return;
-    event.preventDefault(); // Empêche le défilement de la page
 
     const touch = event.touches[0];
     const dx = touch.clientX - this.startX;
@@ -99,6 +126,10 @@ class Canvas {
 
     this.ctx.save();
     this.ctx.translate(this.offsetX, this.offsetY);
+
+    this.ctx.strokeStyle = "rgb(90, 90, 90)";
+    this.drawGrid();
+
     this.ctx.fillStyle = "#fff";
     const cellObjects = this.game.getCellObjects();
     for (const cell of cellObjects) {
@@ -111,6 +142,25 @@ class Canvas {
     }
     this.ctx.restore();
   }
+
+  drawGrid() {
+    const TILES_X = Math.floor((this.canvas.width + Math.abs(this.offsetX)) / this.cellSize) + 2;
+    const TILES_Y = Math.floor((this.canvas.height + Math.abs(this.offsetY)) / this.cellSize) + 2;
+    
+    for (let x = -Math.abs(this.offsetX); x < TILES_X; x++) {
+      this.ctx.beginPath();
+      this.ctx.moveTo(x * this.cellSize - 0.5, -this.offsetY);
+      this.ctx.lineTo(x * this.cellSize - 0.5, this.canvas.height - this.offsetY);
+      this.ctx.stroke();
+    }
+    for (let y = -Math.abs(this.offsetY); y < TILES_Y; y++) {
+      this.ctx.beginPath();
+      this.ctx.moveTo(-this.offsetX, y * this.cellSize - 0.5);
+      this.ctx.lineTo(this.canvas.width - this.offsetX, y * this.cellSize - 0.5);
+      this.ctx.stroke();
+    }
+  }
+
 }
 
 
@@ -178,7 +228,13 @@ const game = new Game([
 const canvasInstance = new Canvas(game);
 canvasInstance.draw();
 
+window.addEventListener("resize", () => {
+  canvasInstance.canvas.width = window.innerWidth;
+  canvasInstance.canvas.height = window.innerHeight;
+  canvasInstance.draw();
+});
+
 setInterval(() => {
   canvasInstance.draw();
   game.nextGeneration();
-}, 250);
+}, 100);
